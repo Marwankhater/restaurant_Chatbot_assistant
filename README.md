@@ -97,15 +97,3 @@ python app.py
 - ✅ Accurate intent recognition across common restaurant scenarios
 
 ---
-
-## 🙋‍♂️ Author
-
-**Marwan Ashraf**
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?logo=linkedin)](https://linkedin.com/in/your-profile)
-[![GitHub](https://img.shields.io/badge/GitHub-Follow-black?logo=github)](https://github.com/your-username)
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.
