@@ -1,0 +1,20 @@
+version: "3.1"
+
+stories:
+- story: greet, then start a booking
+  steps:
+  - user: |
+      مرحبا
+    intent: greet
+  - action: utter_greet
+  - user: |
+      أريد حجز طاولة
+    intent: book_table
+  - action: utter_ask_guests_number
+
+- story: say goodbye
+  steps:
+  - user: |
+      مع السلامة
+    intent: goodbye
+  - action: utter_goodbye
