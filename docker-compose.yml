@@ -1,0 +1,34 @@
+# docker compose up -d --build
+# Trains the model on first start, then serves the bot on :5005 (REST and Socket.IO) and the
+# actions on :5055. Bookings and conversations are kept in the `data` volume.
+services:
+  actions:
+    build: .
+    environment:
+      RESTAURANT_TZ: ${RESTAURANT_TZ:-Africa/Cairo}
+      RESTAURANT_OPENS: ${RESTAURANT_OPENS:-12:00}
+      RESTAURANT_LAST_SEATING: ${RESTAURANT_LAST_SEATING:-22:00}
+      RESTAURANT_SEATING_MINUTES: ${RESTAURANT_SEATING_MINUTES:-120}
+      RESTAURANT_TABLES: ${RESTAURANT_TABLES:-1:2,2:2,3:4,4:4,5:4,6:6,7:8}
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+  rasa:
+    image: rasa/rasa:3.6.21-full
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - data:/app/data
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        [ -f models/assistant.tar.gz ] || rasa train --fixed-model-name assistant &&
+        rasa run -m models/assistant.tar.gz --enable-api --cors "*"
+        --credentials channels.yml --endpoints endpoints.docker.yml
+    ports: ["127.0.0.1:5005:5005"]
+    depends_on: [actions]
+    restart: unless-stopped
+
+volumes:
+  data:

@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  domain:
+    name: booking logic and actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.10", cache: pip }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check . && ruff format --check .
+      - run: pytest -q --ignore=tests/e2e
+
+  assistant:
+    name: train, evaluate and talk to the bot
+    needs: domain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.10", cache: pip }
+      - run: pip install -r requirements.txt pytest
+      - run: rasa data validate
+      - run: rasa train --fixed-model-name assistant
+      - name: Start the action server and the bot
+        run: |
+          export RESTAURANT_DB="$RUNNER_TEMP/restaurant.db"
+          rasa run actions --port 5055 > actions.log 2>&1 &
+          rasa run -m models/assistant.tar.gz --enable-api --credentials channels.yml --port 5005 > rasa.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf localhost:5005/status >/dev/null && curl -sf localhost:5055/health >/dev/null && exit 0
+            sleep 3
+          done
+          cat rasa.log actions.log; exit 1
+      - name: Story tests
+        run: rasa test core --stories tests/test_stories.yml -m models/assistant.tar.gz --fail-on-prediction-errors
+      - name: Intent accuracy on held-out sentences
+        shell: bash
+        run: |
+          rasa test nlu --nlu tests/nlu_test.yml -m models/assistant.tar.gz --out results
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          r = json.load(open("results/intent_report.json"))
+          print(f"Held-out intent accuracy: {r['accuracy']:.3f}, macro F1: {r['macro avg']['f1-score']:.3f}")
+          PY
+      - name: Whole conversations
+        run: RASA_URL=http://localhost:5005 pytest -q tests/e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: rasa-results, path: results/ }
