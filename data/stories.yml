@@ -1,77 +1,46 @@
 version: "3.1"
 
 stories:
-- story: حجز طاولة ناجح
+- story: booking from greeting to confirmation
   steps:
   - intent: greet
   - action: utter_greet
   - intent: book_table
-  - action: utter_ask_guests_number
-  - intent: inform
-    entities:
-      - number: "2"
+  - action: reservation_form
+  - active_loop: reservation_form
+  - active_loop: null
   - slot_was_set:
-      - guests_number: "2"
-  - action: utter_ask_reservation_date
-  - intent: inform
-    entities:
-      - date: "اليوم"
-  - slot_was_set:
-      - reservation_date: "اليوم"
-  - action: utter_ask_reservation_time
-  - intent: inform
-    entities:
-      - time: "8 مساء"
-  - slot_was_set:
-      - reservation_time: "8 مساء"
-  - action: utter_ask_customer_name
-  - intent: inform
-    entities:
-      - name: "محمد"
-  - slot_was_set:
-      - customer_name: "محمد"
+    - requested_slot: null
   - action: action_check_availability
   - slot_was_set:
-      - available_table: 1.0
-      - has_availability: true
-  - action: utter_confirm_booking
-  - intent: confirm
+    - awaiting_confirmation: true
+  - intent: affirm
   - action: action_create_reservation
-  - slot_was_set:
-      - reservation_id: 1.0
-  - action: utter_booking_confirmed
-  - intent: goodbye
-  - action: utter_goodbye
+  - intent: thank
+  - action: utter_you_are_welcome
 
-- story: لا يوجد طاولات متاحة
+- story: guest changes their mind at the confirmation
   steps:
   - intent: book_table
-  - action: utter_ask_guests_number
-  - intent: inform
-    entities:
-      - number: "6"
+  - action: reservation_form
+  - active_loop: reservation_form
+  - active_loop: null
   - slot_was_set:
-      - guests_number: "6"
-  - action: utter_ask_reservation_date
-  - intent: inform
-    entities:
-      - date: "غدا"
-  - slot_was_set:
-      - reservation_date: "غدا"
-  - action: utter_ask_reservation_time
-  - intent: inform
-    entities:
-      - time: "7 مساء"
-  - slot_was_set:
-      - reservation_time: "7 مساء"
-  - action: utter_ask_customer_name
-  - intent: inform
-    entities:
-      - name: "أحمد"
-  - slot_was_set:
-      - customer_name: "أحمد"
+    - requested_slot: null
   - action: action_check_availability
   - slot_was_set:
-      - available_table: 0.0
-      - has_availability: false
-  - action: utter_no_availability
+    - awaiting_confirmation: true
+  - intent: deny
+  - action: action_discard_draft
+
+- story: cancel a reservation
+  steps:
+  - intent: cancel_reservation
+  - action: lookup_form
+  - active_loop: lookup_form
+  - active_loop: null
+  - slot_was_set:
+    - requested_slot: null
+  - action: action_lookup_reservation
+  - intent: goodbye
+  - action: utter_goodbye

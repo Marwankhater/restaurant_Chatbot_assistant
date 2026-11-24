@@ -3,107 +3,221 @@ version: "3.1"
 intents:
   - greet
   - goodbye
+  - thank
   - book_table
   - inform
-  - confirm
+  - affirm
   - deny
+  - cancel_reservation
+  - check_reservation
+  - ask_opening_hours
+  - bot_challenge
+  - nlu_fallback
 
 entities:
   - number
-  - time
   - date
+  - time
   - name
+  - phone
+  - reservation_code
 
 slots:
-  guests_number:
-    type: text
-    influence_conversation: true
+  party_size:
+    type: float
+    influence_conversation: false
     mappings:
       - type: from_entity
         entity: number
-  reservation_time:
-    type: text
-    influence_conversation: true
-    mappings:
-      - type: from_entity
-        entity: time
+        conditions:
+          - active_loop: reservation_form
+      - type: from_text
+        not_intent: [ask_opening_hours, deny, cancel_reservation, check_reservation, bot_challenge]
+        conditions:
+          - active_loop: reservation_form
+            requested_slot: party_size
+
   reservation_date:
     type: text
-    influence_conversation: true
+    influence_conversation: false
     mappings:
       - type: from_entity
         entity: date
-        
-  customer_name:
+        conditions:
+          - active_loop: reservation_form
+      - type: from_text
+        not_intent: [ask_opening_hours, deny, cancel_reservation, check_reservation, bot_challenge]
+        conditions:
+          - active_loop: reservation_form
+            requested_slot: reservation_date
+
+  reservation_time:
     type: text
-    influence_conversation: true
+    influence_conversation: false
+    mappings:
+      - type: from_entity
+        entity: time
+        conditions:
+          - active_loop: reservation_form
+      - type: from_text
+        not_intent: [ask_opening_hours, deny, cancel_reservation, check_reservation, bot_challenge]
+        conditions:
+          - active_loop: reservation_form
+            requested_slot: reservation_time
+
+  guest_name:
+    type: text
+    influence_conversation: false
     mappings:
       - type: from_entity
         entity: name
-    
-  available_table:
-    type: float
-    influence_conversation: true
+        conditions:
+          - active_loop: reservation_form
+      - type: from_text
+        not_intent: [ask_opening_hours, deny, cancel_reservation, check_reservation, bot_challenge]
+        conditions:
+          - active_loop: reservation_form
+            requested_slot: guest_name
+
+  phone:
+    type: text
+    influence_conversation: false
     mappings:
-      - type: custom
-      
-  has_availability:
+      - type: from_entity
+        entity: phone
+      - type: from_text
+        not_intent: [ask_opening_hours, deny, cancel_reservation, check_reservation, bot_challenge]
+        conditions:
+          - active_loop: reservation_form
+            requested_slot: phone
+          - active_loop: lookup_form
+            requested_slot: phone
+
+  reservation_code:
+    type: text
+    influence_conversation: false
+    mappings:
+      - type: from_entity
+        entity: reservation_code
+      - type: from_text
+        not_intent: [ask_opening_hours, deny, cancel_reservation, check_reservation, bot_challenge]
+        conditions:
+          - active_loop: lookup_form
+            requested_slot: reservation_code
+
+  lookup_purpose:
+    type: categorical
+    values: [cancel, check]
+    influence_conversation: false
+    mappings:
+      - type: from_intent
+        intent: cancel_reservation
+        value: cancel
+      - type: from_intent
+        intent: check_reservation
+        value: check
+
+  awaiting_confirmation:
     type: bool
-    influence_conversation: true
     initial_value: false
+    influence_conversation: true
     mappings:
       - type: custom
-  
-  reservation_id:
-    type: float
-    mappings:
-      - type: custom
+
+forms:
+  reservation_form:
+    required_slots:
+      - party_size
+      - reservation_date
+      - reservation_time
+      - guest_name
+      - phone
+  lookup_form:
+    required_slots:
+      - reservation_code
+      - phone
 
 responses:
   utter_greet:
-    - text: "مرحبا بك في مطعمنا! كيف يمكنني مساعدتك اليوم؟"
-
+    - text: "أهلًا بك! أستطيع حجز طاولة لك، أو عرض حجزك أو إلغاءه. كيف أساعدك؟"
   utter_goodbye:
-    - text: "شكرا لك، نتطلع لرؤيتك قريبا!"
+    - text: "شكرًا لك، نتطلع لاستقبالك!"
+  utter_you_are_welcome:
+    - text: "على الرحب والسعة."
+  utter_iamabot:
+    - text: "أنا مساعد آلي لحجوزات المطعم. للحالات الخاصة يمكنك الاتصال بالمطعم مباشرة."
+  utter_default:
+    - text: "عذرًا، لم أفهم. أستطيع حجز طاولة، أو عرض حجز، أو إلغاء حجز."
 
-  utter_ask_guests_number:
-    - text: "لكم شخص تريد حجز طاولة؟"
-
-  utter_ask_reservation_time:
-    - text: "في أي وقت تريد الحجز؟"
-
+  utter_ask_party_size:
+    - text: "لكم شخص تريد الحجز؟"
   utter_ask_reservation_date:
-    - text: "في أي تاريخ تريد الحجز؟"
-    
-  utter_ask_customer_name:
-    - text: "ما هو اسمك من فضلك؟"
+    - text: "في أي يوم؟ مثلًا: اليوم، غدًا، الجمعة، أو 25/12."
+  utter_ask_reservation_time:
+    - text: "في أي ساعة؟ مثلًا: 8 مساءً أو 8:30."
+  utter_ask_guest_name:
+    - text: "ما الاسم الذي نسجل به الحجز؟"
+  utter_ask_phone:
+    - text: "ما رقم موبايلك؟ سنحتاجه إذا أردت إلغاء الحجز لاحقًا."
+  utter_ask_reservation_code:
+    - text: "ما رقم الحجز؟ يبدأ بـ R، مثل R-48213."
+
+  utter_invalid_party_size:
+    - text: "لم أفهم العدد. اكتبه رقمًا من فضلك، مثل 4."
+  utter_party_too_large:
+    - text: "أكبر طاولة لدينا تتسع لـ {largest} أشخاص. للمجموعات الأكبر يرجى الاتصال بالمطعم، أو أخبرني بعدد أقل."
+  utter_invalid_date:
+    - text: "لم أفهم التاريخ. اكتب مثلًا: غدًا، الجمعة، أو 25/12."
+  utter_date_in_past:
+    - text: "هذا التاريخ مضى. أي يوم قادم يناسبك؟"
+  utter_date_too_far:
+    - text: "نستقبل الحجوزات لمدة {days} يومًا قادمة فقط. اختر تاريخًا أقرب من فضلك."
+  utter_invalid_time:
+    - text: "لم أفهم الوقت. اكتب مثلًا: 8 مساءً أو 20:30."
+  utter_outside_hours:
+    - text: "نستقبل الحجوزات من {opens} حتى {last}. أي وقت في هذه الفترة يناسبك؟"
+  utter_invalid_name:
+    - text: "اكتب الاسم من فضلك، بالحروف فقط."
+  utter_invalid_phone:
+    - text: "رقم الموبايل غير صحيح. اكتبه هكذا: 01012345678."
+  utter_invalid_code:
+    - text: "لم أجد رقم حجز في رسالتك. رقم الحجز يبدأ بـ R، مثل R-48213."
 
   utter_confirm_booking:
-    - text: "هل تريد تأكيد الحجز لـ {guests_number} أشخاص في تاريخ {reservation_date} الساعة {reservation_time}؟"
-
+    - text: "سأحجز طاولة {party} يوم {day} الساعة {at} باسم {name}. هل أؤكد الحجز؟"
   utter_booking_confirmed:
-    - text: "تم تأكيد حجزك بنجاح! رقم الحجز الخاص بك هو {reservation_id}. نتطلع لاستقبالك."
+    - text: "تم تأكيد حجزك. رقم الحجز {code}، {party} يوم {day} الساعة {at}. احتفظ بالرقم إذا أردت تعديل الحجز أو إلغاءه."
+  utter_booking_not_made:
+    - text: "لم أحجز شيئًا. إذا أردت البدء من جديد قل: أريد حجز طاولة."
+  utter_fully_booked_alternatives:
+    - text: "لا توجد طاولة متاحة في هذا الوقت. الأوقات المتاحة في نفس اليوم: {options}. أي وقت يناسبك؟"
+  utter_fully_booked_day:
+    - text: "هذا اليوم محجوز بالكامل لعددكم. هل يناسبك يوم آخر؟"
+  utter_time_passed:
+    - text: "هذا الوقت مضى. اختر وقتًا لاحقًا من فضلك."
+  utter_cannot_book:
+    - text: "لا أستطيع إتمام هذا الحجز. يمكنك الاتصال بالمطعم مباشرة."
+  utter_opening_hours:
+    - text: "نستقبل الحجوزات يوميًا من {opens} حتى {last}."
 
-  utter_no_availability:
-    - text: "آسف، لا يوجد طاولات متاحة لـ {guests_number} أشخاص في {reservation_date} الساعة {reservation_time}. هل تريد تجربة وقت آخر؟"
-
-  utter_default:
-    - text: "آسف، لم أفهم. هل يمكنك إعادة صياغة طلبك؟"
+  utter_reservation_details:
+    - text: "حجز {code}: {party} يوم {day} الساعة {at}. الحالة: {status}."
+  utter_reservation_cancelled:
+    - text: "تم إلغاء الحجز {code}. نتمنى رؤيتك قريبًا."
+  utter_reservation_already_cancelled:
+    - text: "الحجز {code} ملغى بالفعل."
+  utter_reservation_not_found:
+    - text: "لم أجد حجزًا بهذا الرقم ورقم الموبايل معًا. تأكد من الرقمين وحاول مرة أخرى."
 
 actions:
+  - validate_reservation_form
+  - validate_lookup_form
   - action_check_availability
   - action_create_reservation
-  - utter_greet
-  - utter_goodbye
-  - utter_ask_guests_number
-  - utter_ask_reservation_time
-  - utter_ask_reservation_date
-  - utter_ask_customer_name
-  - utter_confirm_booking
-  - utter_booking_confirmed
-  - utter_no_availability
-  - utter_default
+  - action_discard_draft
+  - action_lookup_reservation
+  - action_opening_hours
 
 session_config:
   session_expiration_time: 60
-  carry_over_slots_to_new_session: true
+  carry_over_slots_to_new_session: false

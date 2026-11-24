@@ -1,0 +1,74 @@
+version: "3.1"
+# Held out: none of these sentences appear in data/nlu.yml. Used to measure intent accuracy.
+nlu:
+- intent: greet
+  examples: |
+    - أهلين
+    - السلام عليكم ورحمة الله
+    - صباحو
+    - مساء الفل
+    - hey there
+- intent: goodbye
+  examples: |
+    - سلام عليكم وشكرا
+    - مع ألف سلامة
+    - يلا باي
+    - good bye
+- intent: thank
+  examples: |
+    - شكرا ليك
+    - متشكر جدا
+    - تسلم يا باشا
+    - many thanks
+- intent: book_table
+  examples: |
+    - عايز أعمل حجز
+    - محتاج أحجز ترابيزة لبكرة
+    - ينفع أحجز عندكم الخميس
+    - أريد طاولة لأربعة أشخاص
+    - عاوزين ترابيزة لعيلة
+    - I'd like to reserve a table
+- intent: inform
+  examples: |
+    - احنا خمسة
+    - تمانية أشخاص
+    - يوم السبت
+    - الساعة عشرة
+    - 9 ونص
+    - اسمي كريم
+    - 01011112222
+- intent: affirm
+  examples: |
+    - أيوه أكد
+    - تمام كده
+    - موافق جدا
+    - sure
+- intent: deny
+  examples: |
+    - لا مش عايز
+    - لأ شكرا
+    - لا خلاص
+    - nope
+- intent: cancel_reservation
+  examples: |
+    - عايز ألغي حجز بكرة
+    - من فضلك ألغِ حجزي
+    - ألغي الحجز بتاعي
+    - I need to cancel
+- intent: check_reservation
+  examples: |
+    - عايز أعرف حجزي الساعة كام
+    - ممكن أتأكد من حجزي
+    - تفاصيل حجزي من فضلك
+    - is my booking confirmed
+- intent: ask_opening_hours
+  examples: |
+    - بتشتغلوا لحد الساعة كام
+    - إمتى بتفتحوا
+    - مواعيد المطعم
+    - what are your hours
+- intent: bot_challenge
+  examples: |
+    - انت بشر
+    - هو انت روبوت
+    - am I talking to a human

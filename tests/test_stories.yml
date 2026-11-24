@@ -1,19 +1,42 @@
 version: "3.1"
 
 stories:
-- story: greet, then start a booking
+- story: greeting
   steps:
   - user: |
-      مرحبا
+      السلام عليكم
     intent: greet
   - action: utter_greet
-  - user: |
-      أريد حجز طاولة
-    intent: book_table
-  - action: utter_ask_guests_number
 
-- story: say goodbye
+- story: start a booking in Egyptian Arabic
   steps:
+  - user: |
+      عايز أحجز ترابيزة
+    intent: book_table
+  - action: reservation_form
+  - active_loop: reservation_form
+
+- story: start a cancellation
+  steps:
+  - user: |
+      عايز ألغي الحجز
+    intent: cancel_reservation
+  - action: lookup_form
+  - active_loop: lookup_form
+
+- story: opening hours
+  steps:
+  - user: |
+      مواعيدكم إيه
+    intent: ask_opening_hours
+  - action: action_opening_hours
+
+- story: thanks and goodbye
+  steps:
+  - user: |
+      متشكر
+    intent: thank
+  - action: utter_you_are_welcome
   - user: |
       مع السلامة
     intent: goodbye

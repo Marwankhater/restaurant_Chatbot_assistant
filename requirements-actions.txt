@@ -1,0 +1,2 @@
+# The action server and the booking domain only; much lighter than full Rasa.
+rasa-sdk==3.6.2

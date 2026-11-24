@@ -1,7 +1,8 @@
+# Local development. Docker uses endpoints.docker.yml, where the action server is the `actions` service.
 action_endpoint:
   url: "http://localhost:5055/webhook"
 
 tracker_store:
-  type: SQLTrackerStore
+  type: SQL
   dialect: "sqlite"
-  db: "rasa.db"
+  db: "rasa_tracker.db"

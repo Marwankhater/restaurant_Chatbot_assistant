@@ -1,48 +1,116 @@
 version: "3.1"
 
 rules:
-- rule: ترحيب عند بداية المحادثة
-  conversation_start: true
+- rule: greet
   steps:
   - intent: greet
   - action: utter_greet
 
-- rule: وداع عند نهاية المحادثة
+- rule: goodbye
   steps:
   - intent: goodbye
   - action: utter_goodbye
 
-- rule: الرد على طلب حجز طاولة
+- rule: thanks
+  steps:
+  - intent: thank
+  - action: utter_you_are_welcome
+
+- rule: say it is a bot
+  steps:
+  - intent: bot_challenge
+  - action: utter_iamabot
+
+- rule: opening hours
+  condition:
+  - active_loop: null
+  steps:
+  - intent: ask_opening_hours
+  - action: action_opening_hours
+
+- rule: not understood
+  steps:
+  - intent: nlu_fallback
+  - action: utter_default
+
+# Booking -------------------------------------------------------------------
+
+- rule: start a booking
+  condition:
+  - active_loop: null
   steps:
   - intent: book_table
-  - action: utter_ask_guests_number
+  - action: reservation_form
+  - active_loop: reservation_form
 
-- rule: سؤال عن التاريخ بعد تحديد عدد الأشخاص
+- rule: all details collected, check the table
   condition:
+  - active_loop: reservation_form
+  steps:
+  - action: reservation_form
   - active_loop: null
   - slot_was_set:
-    - guests_number: true
-  steps:
-  - action: utter_ask_reservation_date
+    - requested_slot: null
+  - action: action_check_availability
 
-- rule: سؤال عن الوقت بعد تحديد التاريخ
+- rule: guest confirms
   condition:
-  - active_loop: null
   - slot_was_set:
-    - reservation_date: true
+    - awaiting_confirmation: true
   steps:
-  - action: utter_ask_reservation_time
-
-- rule: سؤال عن الاسم بعد تحديد الوقت
-  condition:
-  - active_loop: null
-  - slot_was_set:
-    - reservation_time: true
-  steps:
-  - action: utter_ask_customer_name
-
-- rule: إنشاء الحجز بعد التأكيد
-  steps:
-  - intent: confirm
+  - intent: affirm
   - action: action_create_reservation
-  - action: utter_booking_confirmed
+
+- rule: guest declines
+  condition:
+  - slot_was_set:
+    - awaiting_confirmation: true
+  steps:
+  - intent: deny
+  - action: action_discard_draft
+
+- rule: opening hours asked in the middle of a booking
+  condition:
+  - active_loop: reservation_form
+  steps:
+  - intent: ask_opening_hours
+  - action: action_opening_hours
+  - action: reservation_form
+  - active_loop: reservation_form
+
+- rule: guest stops in the middle of a booking
+  condition:
+  - active_loop: reservation_form
+  steps:
+  - intent: deny
+  - action: action_deactivate_loop
+  - active_loop: null
+  - action: action_discard_draft
+
+# Looking up and cancelling -------------------------------------------------
+
+- rule: start a cancellation
+  condition:
+  - active_loop: null
+  steps:
+  - intent: cancel_reservation
+  - action: lookup_form
+  - active_loop: lookup_form
+
+- rule: start a lookup
+  condition:
+  - active_loop: null
+  steps:
+  - intent: check_reservation
+  - action: lookup_form
+  - active_loop: lookup_form
+
+- rule: code and phone collected
+  condition:
+  - active_loop: lookup_form
+  steps:
+  - action: lookup_form
+  - active_loop: null
+  - slot_was_set:
+    - requested_slot: null
+  - action: action_lookup_reservation

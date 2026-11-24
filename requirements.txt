@@ -1,1 +1,2 @@
-rasa>=3.5,<4.0
+# The assistant (Rasa Open Source). Python 3.8 to 3.10.
+rasa==3.6.21
