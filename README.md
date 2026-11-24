@@ -4,105 +4,146 @@
 
 # Restaurant Reservation Assistant
 
-A Rasa 3 chatbot that takes table reservations in Arabic. It asks for the number of guests, the date,
-the time and a name, checks a SQLite database for a free table, and gives back a booking number.
+[![ci](https://github.com/Marwankhater/restaurant_Chatbot_assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Marwankhater/restaurant_Chatbot_assistant/actions/workflows/ci.yml)
 
-## What it handles
+A Rasa 3 assistant that books, looks up and cancels restaurant tables in Arabic, including the
+Egyptian dialect, with English understood too. It asks only for what is missing, reads answers the
+way people actually write them ("احنا تلاتة", "بكرة 9 بالليل", "8 ونص", "٠١٠١٢٣٤٥٦٧٨"), checks
+the real table plan before confirming, and never books the same table twice.
 
-- Greetings, goodbyes, yes/no answers and the booking request itself
-- Arabic number words (شخصين، ثلاثة), "اليوم" and "غدا", and times like "8 مساء", which get converted before the availability check
-- Picking the smallest table that fits the group
-- Telling the customer when nothing is free at that time
+## Results
+
+| Check | Result |
+|---|---|
+| Booking logic and actions (`pytest`) | 92 tests passing |
+| Whole conversations against the running bot (`tests/e2e`) | 5 of 5 |
+| Story tests (`rasa test core`) | 5 of 5 stories, 12 of 12 actions |
+| Intent accuracy on 49 held-out sentences never seen in training | 0.918 (macro F1 0.912) |
+
+The held-out sentences in `tests/nlu_test.yml` are written separately from the training data,
+in the same mix of Modern Standard Arabic, Egyptian Arabic and English. CI retrains the model and
+reruns all of the above on every push.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    U["Customer message"] --> N["NLU (DIET)<br/>intents + entities"]
-    N --> P["Dialogue policies"]
-    P --> Q["Ask for guests,<br/>date, time, name"]
-    Q --> U
-    P --> A["action_check_availability"]
-    A --> DB[("SQLite")]
-    A --> C{"Table free?"}
-    C -- yes --> R["action_create_reservation"]
-    R --> DB
-    R --> OK["Booking number"]
-    C -- no --> X["Ask for another time"]
+    G([Guest]) -->|REST or Socket.IO| R[Rasa server<br/>DIET intents and entities<br/>rules, TED policy]
+    R -->|forms| V[Validation actions<br/>parse each answer]
+    V --> P[restaurant/parsing.py<br/>numbers, dates, times,<br/>phones in Arabic and English]
+    R --> A[Booking actions]
+    A --> B[restaurant/booking.py<br/>availability, booking,<br/>lookup, cancellation]
+    B --> DB[(SQLite)]
 ```
 
-The NLU pipeline is a DIET classifier on top of word and character n-gram features (the char n-grams
-help with spelling variations in Arabic). Dialogue runs on RulePolicy, MemoizationPolicy and TEDPolicy.
-The two custom actions in `actions/actions.py` call `database.py`, which has the schema and the booking logic.
+**Booking.** A form collects party size, day, time, name and mobile number. Anything the guest
+already said in the first message ("احجزلي ترابيزة لاتنين بكرة 9 بالليل") is used, and only the
+rest is asked. The bot then checks a table, repeats the booking back, and books only after a yes.
 
-## Project layout
+**Looking up and cancelling.** A second form asks for the booking code and the mobile number used
+to book. Both must match: a code on its own reveals nothing.
 
-```
-restaurant_Chatbot_assistant/
-├── actions/actions.py      # check availability, create reservation
-├── data/
-│   ├── nlu.yml             # Arabic training examples
-│   ├── rules.yml
-│   └── stories.yml
-├── docs/sample-conversation.md
-├── tests/test_stories.yml
-├── config.yml              # pipeline and policies
-├── domain.yml              # intents, entities, slots, responses
-├── endpoints.yml           # action server and tracker store
-├── database.py             # SQLite schema + availability and booking logic
-└── requirements.txt
-```
+**Opening hours** can be asked at any point, including in the middle of a booking, which then
+carries on where it stopped.
+
+## Engineering decisions
+
+**The booking rules live outside Rasa.** `restaurant/` is plain Python with no Rasa import, so
+the rules that matter most (who gets which table, when) are tested directly and quickly, and
+could sit behind a WhatsApp or web channel without change. The Rasa actions only translate.
+
+**A table is free when no seating overlaps.** Each booking holds its table for the seating length
+(two hours by default). The original version only compared start times as text, so 8:00 and 8:30
+could land on the same table.
+
+**No double booking under load.** The availability check and the insert run inside one SQLite
+write transaction (`BEGIN IMMEDIATE`). A test fires eight requests for the last table at the same
+moment and exactly one succeeds. If someone takes the table between the confirmation question and
+the guest's yes, the guest gets the nearest free times instead of an error.
+
+**Nothing is guessed.** An answer the bot cannot read is asked for again, with an example. The
+original version silently fell back to two guests or 8 pm. When the form has asked for a value,
+the whole message is parsed, so "3 الفجر" is read as 3 am (and refused, outside opening hours)
+rather than an entity extractor's partial "3".
+
+**Specific replies.** A day that has passed, a date beyond the booking horizon, a time outside
+opening hours, a party larger than any table, or a full slot each get their own answer, and a full
+slot comes with the nearest free times that day.
+
+**Unguessable codes, and Arabic that reads right.** Booking codes are random (`R-48213`), not a
+running number. Party sizes follow Arabic number agreement ("لشخصين", "لـ 3 أشخاص").
 
 ## Running it
 
-You need Python 3.8 to 3.10, since Rasa 3 doesn't support newer versions.
+With Docker (trains the model on first start):
 
 ```bash
-git clone https://github.com/Marwankhater/restaurant_Chatbot_assistant.git
-cd restaurant_Chatbot_assistant
+docker compose up -d --build
+```
 
+Without Docker, on Python 3.10:
+
+```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-python database.py   # creates restaurant.db with a few sample tables
 rasa train
+rasa run actions                                   # terminal 1
+rasa run --enable-api --credentials channels.yml   # terminal 2
 ```
 
-Then, from the project root, start the action server in one terminal:
+Then talk to it over REST:
 
 ```bash
-rasa run actions
+curl -s localhost:5005/webhooks/rest/webhook -H "Content-Type: application/json" \
+  -d '{"sender": "me", "message": "عايز أحجز ترابيزة لتلاتة بكرة"}'
 ```
 
-and chat with the bot in another:
+or with `rasa shell`.
+
+### Settings
+
+| Variable | Default | |
+|---|---|---|
+| `RESTAURANT_DB` | `restaurant.db` | SQLite file for bookings |
+| `RESTAURANT_TZ` | `Africa/Cairo` | Time zone for "today" and "tomorrow" |
+| `RESTAURANT_OPENS`, `RESTAURANT_LAST_SEATING` | `12:00`, `22:00` | First and last bookable start time |
+| `RESTAURANT_SEATING_MINUTES` | `120` | How long a booking holds its table |
+| `RESTAURANT_HORIZON_DAYS` | `60` | How far ahead guests can book |
+| `RESTAURANT_TABLES` | `1:2,2:2,3:4,4:4,5:4,6:6,7:8` | Table number and seats |
+
+## Tests
 
 ```bash
-rasa shell
+pip install -r requirements-dev.txt
+pytest --ignore=tests/e2e                     # booking logic, parsing and actions
+rasa test core --stories tests/test_stories.yml
+rasa test nlu --nlu tests/nlu_test.yml        # held-out intent accuracy
+RASA_URL=http://localhost:5005 pytest tests/e2e   # whole conversations, bot running
 ```
 
-`rasa test` runs the test stories.
+## Project layout
 
-## Example
+```text
+restaurant/
+  parsing.py        numbers, dates, times, phones and codes, in Arabic and English
+  booking.py        table plan, overlap-aware availability, atomic booking, lookup, cancel
+  settings.py       opening hours, seating length, tables, from environment variables
+actions/actions.py  form validation and booking actions (thin adapters over restaurant/)
+data/               training data: NLU, rules, stories
+domain.yml          intents, entities, slots, forms, responses
+config.yml          pipeline (DIET with character n-grams) and policies
+tests/              unit, action, story, held-out NLU and end-to-end tests
+```
 
-<div dir="rtl">
+## Limitations
 
-| | |
-|---|---|
-| 👤 | أريد حجز طاولة |
-| 🤖 | لكم شخص تريد حجز طاولة؟ |
-| 👤 | 2 أشخاص |
-| 🤖 | في أي تاريخ تريد الحجز؟ |
-| 👤 | اليوم |
+- One restaurant and one table plan per deployment.
+- SQLite suits a single action server. Several replicas would need PostgreSQL; the booking code
+  already does the check and insert in one transaction, so moving it is a contained change.
+- The bot replies in Modern Standard Arabic. It understands Egyptian Arabic, but other dialects
+  have only a few training examples.
 
-</div>
-
-The full conversation is in [docs/sample-conversation.md](docs/sample-conversation.md).
-
-## Ideas for later
-
-- Web chat through Rasa's REST channel
-- Cancelling or changing a booking
-- More dialects (Egyptian, Gulf)
+The full sample conversation is in [docs/sample-conversation.md](docs/sample-conversation.md).
 
 ---
 
